@@ -5,8 +5,7 @@
 #include "CppUnitTest.h"
 #include "EventLoggerSink.h"
 #include "FileLoggerSink.h"
-#include "LoggerService.h"
-#include "LoggerSinkProvider.h"
+#include "TestLoggerService.h"
 #include "TestLoggingHost.h"
 
 #include <sstream>
@@ -73,16 +72,16 @@ namespace InstrumentationEngineLibTests
             shared_ptr<CLoggerSinkProvider> pSinkProvider = make_shared<CLoggerSinkProvider>();
             pSinkProvider->SetFileSink(pFileSink);
 
-            CLoggerService logger;
-            logger.SetProvider(pSinkProvider);
+            CTestLoggerService loggerService;
+            loggerService.SetProvider(pSinkProvider);
 
-            AssertSucceeded(logger.Initialize());
+            AssertSucceeded(loggerService.Initialize());
 
-            logger.LogError(L"Error1");
+            loggerService.LogError(L"Error1");
 
             AssertNoLogFile(pFileSink);
 
-            AssertSucceeded(logger.Shutdown());
+            AssertSucceeded(loggerService.Shutdown());
         }
 
         // Tests that the log file sink can write to a file using

@@ -3,19 +3,19 @@
 #include "../InstrumentationEngine.Api/InstrumentationEngine.h"
 
 CInitOnce CLogging::s_initialize([]() { return InitializeCore(); });
-CSingleton<CLoggerService> CLogging::s_logger;
+CSingleton<CLoggerService> CLogging::s_loggerService;
 volatile LONG CLogging::s_initCount = 0;
 
 // static
 bool CLogging::AllowLogEntry(_In_ LoggingFlags flags)
 {
-    return s_logger.Get()->AllowLogEntry(flags);
+    return s_loggerService.Get()->AllowLogEntry(flags);
 }
 
 // static
 HRESULT CLogging::GetLoggingFlags(_Out_ LoggingFlags* pLoggingFlags)
 {
-    return s_logger.Get()->GetLoggingFlags(pLoggingFlags);
+    return s_loggerService.Get()->GetLoggingFlags(pLoggingFlags);
 }
 
 // static
@@ -23,7 +23,7 @@ void CLogging::LogMessage(_In_ const WCHAR* wszMessage, ...)
 {
     va_list argptr;
     va_start(argptr, wszMessage);
-    s_logger.Get()->LogMessage(wszMessage, argptr);
+    s_loggerService.Get()->LogMessage(wszMessage, argptr);
     va_end(argptr);
 }
 
@@ -32,7 +32,7 @@ void CLogging::LogError(_In_ const WCHAR* wszError, ...)
 {
     va_list argptr;
     va_start(argptr, wszError);
-    s_logger.Get()->LogError(wszError, argptr);
+    s_loggerService.Get()->LogError(wszError, argptr);
     va_end(argptr);
 }
 
@@ -41,7 +41,7 @@ void CLogging::LogDumpMessage(_In_ const WCHAR* wszMessage, ...)
 {
     va_list argptr;
     va_start(argptr, wszMessage);
-    s_logger.Get()->LogDumpMessage(wszMessage, argptr);
+    s_loggerService.Get()->LogDumpMessage(wszMessage, argptr);
     va_end(argptr);
 }
 
@@ -52,7 +52,7 @@ HRESULT CLogging::Initialize()
 
     if (s_initialize.IsSuccessful())
     {
-        InterlockedIncrement(&s_initCount);
+        ++s_initCount;
     }
 
     return hr;
@@ -61,25 +61,25 @@ HRESULT CLogging::Initialize()
 // static
 HRESULT CLogging::InitializeCore()
 {
-    return s_logger.Get()->Initialize();
+    return s_loggerService.Get()->Initialize();
 }
 
 // static
 void CLogging::SetLogToDebugPort(_In_ bool enable)
 {
-    s_logger.Get()->SetLogToDebugPort(enable);
+    s_loggerService.Get()->SetLogToDebugPort(enable);
 }
 
 // static
 HRESULT CLogging::SetLoggingFlags(_In_ LoggingFlags loggingFlags)
 {
-    return s_logger.Get()->SetLoggingFlags(loggingFlags);
+    return s_loggerService.Get()->SetLoggingFlags(loggingFlags);
 }
 
 // static
 HRESULT CLogging::SetLoggingHost(_In_ IProfilerManagerLoggingHost* pLoggingHost)
 {
-    return s_logger.Get()->SetLoggingHost(pLoggingHost);
+    return s_loggerService.Get()->SetLoggingHost(pLoggingHost);
 }
 
 // static
@@ -90,9 +90,9 @@ HRESULT CLogging::Shutdown()
         return E_UNEXPECTED;
     }
 
-    if (0 == InterlockedDecrement(&s_initCount))
+    if (0 == --s_initCount)
     {
-        return s_logger.Get()->Shutdown();
+        return s_loggerService.Get()->Shutdown();
     }
     return S_OK;
 }
