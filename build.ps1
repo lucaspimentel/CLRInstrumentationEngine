@@ -100,44 +100,75 @@ if (-not ($repoPath))
 }
 
 ###
-# Picks up msbuild from vs2017 installation
+# Find msbuild from VS installation
 ###
-$VsRequirements = @(
-    'Microsoft.Component.MSBuild'
-    'Microsoft.VisualStudio.Workload.NativeDesktop'
-    'Microsoft.VisualStudio.Component.VC.ATL.Spectre'
-    'Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre'
-)
 
-Write-Verbose -Verbose "Checking for VS installation with these installed components: `n`n$($VsRequirements | Out-String)`n"
-$vswhere = "`"${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe`""
-$filterArgs = "-latest -prerelease -requires $($VsRequirements -join ' ') -property installationPath"
-
-# Restrict the VS version if running from a context that has the VisualStudioVersion env variable (e.g. Developer Command Prompt).
-# This will make sure that VisualStudioVersion matches the VS version of MSBuild in order to avoid mismatches (e.g. using a Dev15
-# Developer Command Prompt but invoking Dev16's MSBuild).
-if ($env:VisualStudioVersion)
+# Restrict the VS version if running from a context that has the VSINSTALLDIR env variable (e.g. Developer Command Prompt).
+if ($env:VSINSTALLDIR)
 {
-    $vsversion = [version]$($env:VisualStudioVersion)
-    # This is a version range that looks like "[15.0,16.0)"
-    $filterArgs = "$filterArgs -version `"[$($vsversion.Major).0,$($vsversion.Major + 1).0)`""
+    Write-Verbose -Verbose "Running in the context of Developer Command Prompt, will use `"$env:VSINSTALLDIR`""
+    $installationPath = $env:VSINSTALLDIR
+}
+else
+{
+    $vswhere = "`"${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe`""
+
+    $Vs2017Requirements = @(
+        'Microsoft.Component.MSBuild'
+        'Microsoft.Net.Component.4.6.1.SDK'
+        'Microsoft.Net.Component.4.6.1.TargetingPack'
+        'Microsoft.VisualStudio.Component.Windows10SDK.14393'
+        'Microsoft.VisualStudio.Component.VC.ATL.Spectre'
+        'Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre'
+    )
+
+    Write-Verbose -Verbose "Checking for VS 2017 installation with these installed components: `n`n$($Vs2017Requirements | Out-String)`n"
+    $filterArgs = "-latest -prerelease -requires $($Vs2017Requirements -join ' ') -property installationPath -version `"[15.0,16.0)`""
+    $installationPath = Invoke-Expression "& $vswhere $filterArgs"
+
+    # Try VS 2019
+    if (!$installationPath)
+    {
+        Write-Warning "Unable to find compatible VS 2017 installation ..."
+
+        $Vs2019Requirements = @(
+            'Microsoft.Component.MSBuild'
+            'Microsoft.Net.Component.4.6.1.SDK'
+            'Microsoft.Net.Component.4.6.1.TargetingPack'
+            'Microsoft.VisualStudio.Component.VC.v141.ATL.Spectre'
+            'Microsoft.VisualStudio.Component.VC.v141.x86.x64.Spectre'
+        )
+
+        Write-Verbose -Verbose "Checking for VS 2019 installation with these installed components: `n`n$($Vs2019Requirements | Out-String)`n"
+        Write-Verbose -Verbose "*****"
+        Write-Verbose -Verbose "Windows SDK v10.0.14393 is not available from VS 2019 installation. You will need to install it from https://developer.microsoft.com/windows/downloads/sdk-archive."
+        Write-Verbose -Verbose "*****"
+        $filterArgs = "-latest -prerelease -requires $($Vs2019Requirements -join ' ') -property installationPath -version `"[16.0,17.0)`""
+        $installationPath = Invoke-Expression "& $vswhere $filterArgs"
+    }
 }
 
-$installationPath = Invoke-Expression "& $vswhere $filterArgs"
-$msbuild = Join-Path $installationPath 'MSBuild\15.0\bin\MSBuild.exe'
-if (-not (Test-Path $msbuild))
+if ($installationPath)
 {
-    $msbuild = Join-Path $installationPath 'MSBuild\Current\bin\MSBuild.exe'
+    $msbuild = Join-Path $installationPath 'MSBuild\15.0\bin\MSBuild.exe'
+    if (!(Test-Path $msbuild))
+    {
+        $msbuild = Join-Path $installationPath 'MSBuild\Current\bin\MSBuild.exe'
+    }
 }
 
-if (-not (Test-Path $msbuild))
+if (!$msbuild -or !(Test-Path $msbuild))
 {
     $msbuild = Join-Path (Read-Host "Please enter the full path to your VS installation (eg. 'C:\Program Files (x86)\Microsoft Visual Studio\Preview\Enterprise)'`r`n") 'MSBuild\15.0\Bin\MSBuild.exe'
 }
 
-if (-not (Test-Path $msbuild))
+if (!$msbuild -or !(Test-Path $msbuild))
 {
-    Write-Error 'Cannot find msbuild.exe. Please check your VS 2017 installation.'
+    Write-Error 'Cannot find msbuild.exe. Please check your VS installations.'
+}
+else
+{
+    Write-Verbose -Verbose "Using msbuild.exe from:`n`"$msbuild`""
 }
 
 $msbuild = "`"$msbuild`""
